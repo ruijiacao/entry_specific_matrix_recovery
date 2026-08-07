@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from model import Graph, sample_instance
+from .model import Graph, sample_instance
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from model import Graph
+from .model import Graph
 
 
 def _boundary(graph: Graph, subset: tuple[int, ...]) -> frozenset[Any]:
@@ -18,7 +18,7 @@ def _boundary(graph: Graph, subset: tuple[int, ...]) -> frozenset[Any]:
     return frozenset(node for node, value in parity.items() if value)
 
 
-def low_degree_corr(graph: Graph, degree: int, source: Any, sink: Any) -> float:
+def low_degree_corr2(graph: Graph, degree: int, source: Any, sink: Any) -> float:
     """Return the squared correlation.
 
     The polynomial basis is
@@ -77,7 +77,7 @@ def _run_basic_tests() -> None:
     graph.add_edge(2, 3, 0.2)
 
     # The only source-sink monomial has all three edges.
-    print(low_degree_corr(graph, 3, 0, 3), 0.6**6)
+    print(low_degree_corr2(graph, 3, 0, 3), 0.6**6)
     # assert np.isclose(low_degree_corr(graph, 3, 0, 3), 0.6**6)
 
 

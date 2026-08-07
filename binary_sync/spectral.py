@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from model import Graph, sample_instance
+from .model import Graph, sample_instance
 
 def _signed_adjacency(graph: Graph, observations: np.ndarray) -> np.ndarray:
     """Return the signed adjacency matrix, using the graph's node order."""
@@ -71,7 +71,7 @@ def nb_spectral(
     return float((1 if signs[index[source]] >= 0 else -1) *
                  (1 if signs[index[target]] >= 0 else -1))
 
-def spectral_corr2(graph, source, target, alg = "nb", n_samples=20_000, seed=0):
+def spectral_corr2(graph, source, target, alg = "naive", n_samples=20_000, seed=0):
     """Estimate the squared correlation between two nodes using spectral methods.
     
     Parameters
