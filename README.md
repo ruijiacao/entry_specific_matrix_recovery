@@ -1,3 +1,7 @@
-## Structure 
+## Structure
+/binary_sync: implementation of various algorithms for the binary synchronization problem on graphs
+/testing: Jupyter notebooks for testing
+/visualization
 
-Run binary_sync_test.ipynb to test the performances of different algorithms
+## Usage
+To play around with different graphs and algorithms, run the command ./run_app.sh

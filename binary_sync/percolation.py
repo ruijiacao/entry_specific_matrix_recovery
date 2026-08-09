@@ -1,6 +1,6 @@
 import numpy as np
 
-from model import Graph, sample_instance
+from .model import Graph, sample_instance
 
 def estimate_percolation_bound(
     graph,
