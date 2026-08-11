@@ -49,12 +49,11 @@ def bp_pair_estimate(
     source: Any,
     target: Any,
     *,
-    max_iter: int = 200,
+    max_iter: int = 50,
     tol: float = 1e-10,
     damping: float = 1.0,
     init: str = "zero",
     seed: Optional[int] = None,
-    random_scale: float = 1e-3,
 ) -> BPResult:
     """Estimate E[sigma_source sigma_target | observations] by BP.
 
@@ -78,8 +77,6 @@ def bp_pair_estimate(
         raise ValueError("max_iter must be nonnegative")
     if tol < 0:
         raise ValueError("tol must be nonnegative")
-    if random_scale < 0:
-        raise ValueError("random_scale must be nonnegative")
 
     if source == target:
         return BPResult(1.0, True, 0, 0.0)
@@ -97,7 +94,7 @@ def bp_pair_estimate(
                 messages[edge_id, u, v] = 0.0
             else:
                 messages[edge_id, u, v] = float(
-                    rng.uniform(-random_scale, random_scale)
+                    rng.random.choice([-1, 1])
                 )
 
     residual = np.inf
@@ -163,7 +160,6 @@ def bp_corr2(
     n_samples=20_000,
     seed=0,
     init="zero",
-    random_scale=1e-1,
     **bp_kwargs,
 ):
     """
@@ -184,7 +180,6 @@ def bp_corr2(
             source,
             target,
             init=init,
-            random_scale=random_scale,
             **bp_kwargs,
         )
         bp_values[i] = result.correlation
