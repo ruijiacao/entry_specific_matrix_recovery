@@ -1,6 +1,7 @@
 import numpy as np
 
 from .model import Graph, sample_instance
+from .reporting import format_estimate
 
 def estimate_percolation_bound(
     graph,
@@ -57,8 +58,9 @@ def _run_basic_tests() -> None:
     graph.add_edge(2, 3, 0.2)
 
     percolation_bd = estimate_percolation_bound(graph, 0, 3, n_samples=20000)
-    print(percolation_bd["bound"])
-    # print(percolation_bd["standard_error"])
+    print("percolation bound: " + format_estimate(
+        percolation_bd["bound"], percolation_bd["standard_error"]
+    ))
 
     # assert naive_spectral(graph, observations, 0, 0) == 1.0
     # assert nb_spectral(graph, observations, 1, 1) == 1.0

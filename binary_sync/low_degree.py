@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 
 from .model import Graph
+from .reporting import format_estimate
 
 
 def _boundary(graph: Graph, subset: tuple[int, ...]) -> frozenset[Any]:
@@ -69,6 +70,131 @@ def low_degree_corr2(graph: Graph, degree: int, source: Any, sink: Any) -> float
     return float(corr2)
 
 
+def low_degree_weights(G: Graph, s, t, p, degree=None):
+    """
+    Compute the optimal low-degree weights w = Sigma^{-1} c.
+
+    A basis element F is represented by a tuple of edge IDs and corresponds
+    to the monomial
+
+        Y_F = product_{e in F} Y_e.
+
+    Only subsets satisfying boundary(F) = {s, t} are included.
+
+    Parameters
+    ----------
+    G : Graph
+        Graph whose edges have attributes `u` and `v`.
+    s, t :
+        Source and target vertices.
+    p : float
+        Edge-flip probability.
+    degree : int or None
+        Maximum monomial degree. If None, use all edge subsets.
+
+    Returns
+    -------
+    dict[tuple[int, ...], float]
+        Maps each basis monomial, represented by its edge IDs, to its
+        optimal coefficient.
+    """
+    if not 0.0 <= p <= 1.0:
+        raise ValueError("p must lie in [0, 1].")
+
+    edges = G.edges
+    num_edges = len(edges)
+
+    if degree is None:
+        degree = num_edges
+
+    if not 0 <= degree <= num_edges:
+        raise ValueError(
+            f"degree must lie between 0 and {num_edges}."
+        )
+
+    target_boundary = set() if s == t else {s, t}
+    basis_masks = []
+
+    for size in range(degree + 1):
+        for edge_ids in combinations(range(num_edges), size):
+            boundary = set()
+            mask = 0
+
+            for edge_id in edge_ids:
+                edge = edges[edge_id]
+
+                # Toggle both endpoints. This also handles self-loops.
+                for vertex in (edge.u, edge.v):
+                    if vertex in boundary:
+                        boundary.remove(vertex)
+                    else:
+                        boundary.add(vertex)
+
+                mask |= 1 << edge_id
+
+            if boundary == target_boundary:
+                basis_masks.append(mask)
+
+    if not basis_masks:
+        return {}
+
+    q = 1.0 - 2.0 * p
+    num_basis = len(basis_masks)
+
+    # c_i = E[(sigma_s sigma_t) Y_{F_i}]
+    c = np.array(
+        [q ** mask.bit_count() for mask in basis_masks],
+        dtype=float,
+    )
+
+    # Sigma_ij = E[Y_{F_i} Y_{F_j}]
+    #          = q^{|F_i symmetric_difference F_j|}.
+    sigma = np.empty((num_basis, num_basis), dtype=float)
+
+    for i, mask_i in enumerate(basis_masks):
+        sigma[i, i] = 1.0
+
+        for j in range(i):
+            value = q ** (mask_i ^ basis_masks[j]).bit_count()
+            sigma[i, j] = value
+            sigma[j, i] = value
+
+    try:
+        weights = np.linalg.solve(sigma, c)
+    except np.linalg.LinAlgError:
+        # Handles degenerate cases such as p = 0 or p = 1.
+        weights = np.linalg.lstsq(sigma, c, rcond=None)[0]
+
+    def mask_to_edge_ids(mask):
+        return tuple(
+            edge_id
+            for edge_id in range(num_edges)
+            if mask & (1 << edge_id)
+        )
+
+    return {
+        mask_to_edge_ids(mask): float(weight)
+        for mask, weight in zip(basis_masks, weights)
+    }
+def print_low_degree_weights(G, weights):
+    print("Edge IDs:")
+    for edge_id, edge in enumerate(G.edges):
+        print(f"  {edge_id}: ({edge.u}, {edge.v})")
+
+    print("\nLow-degree weights:")
+    for edge_ids, weight in weights.items():
+        edge_list = [
+            (G.edges[edge_id].u, G.edges[edge_id].v)
+            for edge_id in edge_ids
+        ]
+
+        print(
+            f"  basis={edge_ids}, "
+            f"edges={edge_list}, "
+            f"weight={weight:.6f}"
+        )
+
+
 def _run_basic_tests() -> None:
     """Small tests for paths and the degree cutoff."""
     graph = Graph()
@@ -77,8 +203,15 @@ def _run_basic_tests() -> None:
     graph.add_edge(2, 3, 0.2)
 
     # The only source-sink monomial has all three edges.
-    print(low_degree_corr2(graph, 3, 0, 3), 0.6**6)
-    # assert np.isclose(low_degree_corr(graph, 3, 0, 3), 0.6**6)
+    weights = low_degree_weights(
+        graph,
+        s=0,
+        t=2,
+        p=0.1,
+        degree=2,)
+
+    print_low_degree_weights(graph, weights)
+
 
 
 

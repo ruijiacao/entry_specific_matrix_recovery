@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 
 from .model import Graph, sample_instance
+from .reporting import format_estimate
 
 
 @dataclass(frozen=True)
@@ -94,7 +95,7 @@ def bp_pair_estimate(
                 messages[edge_id, u, v] = 0.0
             else:
                 messages[edge_id, u, v] = float(
-                    rng.random.choice([-1, 1])
+                    rng.choice([-1, 1])
                 )
 
     residual = np.inf
@@ -237,7 +238,9 @@ def _run_basic_tests() -> None:
 
     # result = bp_pair_result(graph, observations, 0, 2)
     result = bp_corr2(graph, 0, 2, n_samples=1000, seed=7)
-    print(result["corr2"])
+    print("belief propagation: " + format_estimate(
+        result["corr2"], result["standard_error"]
+    ))
 
 
     # random_value = bp_pair_estimate(

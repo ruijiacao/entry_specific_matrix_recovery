@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 from binary_sync.model import Graph
+from binary_sync.reporting import format_estimate
 
 
 Law = Dict[float, float]
@@ -192,7 +193,7 @@ def _run_sanity_check() -> None:
     actual = sp_corr2(graph, "s", "t", p)
     expected = (1.0 - 2.0 * p) ** 6
     assert abs(actual - expected) < 1e-12, (actual, expected)
-    print(actual)
+    print("series-parallel exact: " + format_estimate(actual))
 
 
 if __name__ == "__main__":

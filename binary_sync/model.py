@@ -31,6 +31,12 @@ class Graph:
         self._node_set = set()
         self.edges: List[Edge] = []
 
+    def add_node(self, node: Any) -> None:
+        """Add an isolated vertex if it is not already present."""
+        if node not in self._node_set:
+            self._node_set.add(node)
+            self.nodes.append(node)
+
     def add_edge(self, u: Any, v: Any, p: float) -> int:
         """Add an edge and return its integer edge id.
 
@@ -43,9 +49,7 @@ class Graph:
             raise ValueError("p must lie in [0, 1).")
 
         for node in (u, v):
-            if node not in self._node_set:
-                self._node_set.add(node)
-                self.nodes.append(node)
+            self.add_node(node)
 
         self.edges.append(Edge(u, v, float(p)))
         return len(self.edges) - 1
