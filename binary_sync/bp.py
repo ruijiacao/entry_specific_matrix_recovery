@@ -54,15 +54,16 @@ def bp_pair_estimate(
     tol: float = 1e-10,
     damping: float = 1.0,
     init: str = "zero",
+    initial_point: Optional[np.ndarray] = None,
     seed: Optional[int] = None,
 ) -> BPResult:
     """Estimate E[sigma_source sigma_target | observations] by BP.
 
     The source spin is clamped to +1. The returned marginal at ``target`` is
     therefore the estimate of ``sigma_source * sigma_target``. The same
-    routine supports zero-message initialization and small random
-    initialization. Updates are synchronous: every new message is computed
-    from the messages in the previous iteration.
+    routine supports zero-message initialization, random initialization, and
+    a user-supplied initial point. Updates are synchronous: every new message
+    is computed from the messages in the previous iteration.
 
     Parameters
     ----------
@@ -70,6 +71,11 @@ def bp_pair_estimate(
     observations : array of shape (num_edges,)
         The observed edge measurements, each either -1 or +1.
     init: either "zero" or "random"
+        Ignored when ``initial_point`` is supplied.
+    initial_point : array of shape (2 * num_edges,), optional
+        Initial directed messages. For each edge, entries are ordered as
+        ``edge.u -> edge.v`` followed by ``edge.v -> edge.u``. Messages sent
+        by ``source`` are clamped to +1 regardless of their supplied values.
     """
     # observations = _validate_inputs(
     #     graph, observations, source, target, damping, init
@@ -85,12 +91,29 @@ def bp_pair_estimate(
     rng = np.random.default_rng(seed)
     adj = graph.adjacency()
 
+    if initial_point is not None:
+        initial_point = np.asarray(initial_point, dtype=float)
+        expected_shape = (2 * len(graph.edges),)
+        if initial_point.shape != expected_shape:
+            raise ValueError(
+                f"initial_point must have shape {expected_shape}"
+            )
+        if not np.all(np.isfinite(initial_point)):
+            raise ValueError("initial_point must contain only finite values")
+        if np.any(np.abs(initial_point) > 1):
+            raise ValueError("initial_point entries must lie in [-1, 1]")
+
     # messages[(edge_id, u, v)] is the cavity magnetization m_{u -> v}.
     messages: Dict[Tuple[int, Any, Any], float] = {}
     for edge_id, edge in enumerate(graph.edges):
-        for u, v in ((edge.u, edge.v), (edge.v, edge.u)):
+        directions = ((edge.u, edge.v), (edge.v, edge.u))
+        for direction, (u, v) in enumerate(directions):
             if u == source:
                 messages[edge_id, u, v] = 1.0
+            elif initial_point is not None:
+                messages[edge_id, u, v] = float(
+                    initial_point[2 * edge_id + direction]
+                )
             elif init == "zero":
                 messages[edge_id, u, v] = 0.0
             else:
@@ -161,6 +184,7 @@ def bp_corr2(
     n_samples=20_000,
     seed=0,
     init="zero",
+    initial_point=None,
     **bp_kwargs,
 ):
     """
@@ -181,6 +205,7 @@ def bp_corr2(
             source,
             target,
             init=init,
+            initial_point=initial_point,
             **bp_kwargs,
         )
         bp_values[i] = result.correlation

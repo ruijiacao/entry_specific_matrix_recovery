@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -72,23 +71,31 @@ def nb_spectral(
     return float((1 if signs[index[source]] >= 0 else -1) *
                  (1 if signs[index[target]] >= 0 else -1))
 
-import numpy as np
-
-
 def power_method_estimate(
-    G,
-    observations,
-    s,
-    t,
-    num_iter,
-    p,
+    graph: Graph,
+    observations: np.ndarray,
+    source: Any,
+    target: Any,
+    num_iter: int = 100,
+    p: float | None = None,
 ):
     """
     Apply the power method to the +/-1 observation adjacency matrix.
 
+    The adjacency matrix is shifted by an upper bound on its spectral radius.
+    This makes the iteration converge to the largest algebraic eigenvalue,
+    matching :func:`naive_spectral`, rather than whichever eigenvalue has the
+    largest magnitude.
+
     Returns the hard estimate sign(v_s * v_t).
     """
-    nodes = list(G.nodes)
+    observations = np.asarray(observations)
+    if observations.shape != (len(graph.edges),):
+        raise ValueError("observations must have one entry per edge")
+    if source == target:
+        return 1.0
+
+    nodes = list(graph.nodes)
     node_id = {
         node: i
         for i, node in enumerate(nodes)
@@ -96,7 +103,7 @@ def power_method_estimate(
 
     A = np.zeros((len(nodes), len(nodes)))
 
-    for edge_id, edge in enumerate(G.edges):
+    for edge_id, edge in enumerate(graph.edges):
         u = node_id[edge.u]
         v = node_id[edge.v]
         y = observations[edge_id]
@@ -104,21 +111,41 @@ def power_method_estimate(
         A[u, v] += y
         A[v, u] += y
 
-    vector = np.ones(len(nodes))
+    # Plain power iteration targets the eigenvalue of largest magnitude.  A
+    # signed adjacency matrix can have a negative eigenvalue whose magnitude
+    # exceeds its largest positive eigenvalue, whereas naive_spectral selects
+    # the largest algebraic eigenvalue.  Shifting by the maximum absolute row
+    # sum makes all eigenvalues nonnegative without changing eigenvectors.
+    shift = np.max(np.sum(np.abs(A), axis=1))
+    if shift == 0:
+        return 0.0
+    shifted_A = A + shift * np.eye(len(nodes))
+
+    # A fixed generic initialization avoids exact orthogonality to the leading
+    # eigenspace on symmetric graphs while keeping the estimator deterministic.
+    vector = np.random.default_rng(0).standard_normal(len(nodes))
     vector /= np.linalg.norm(vector)
 
     for _ in range(num_iter):
-        vector = A @ vector
-        vector /= np.linalg.norm(vector)
+        vector = shifted_A @ vector
+        norm = np.linalg.norm(vector)
+        if norm == 0:
+            return 0.0
+        vector /= norm
 
     return float(
-        np.sign(
-            vector[node_id[s]]
-            * vector[node_id[t]]
-        )
+        np.sign(vector[node_id[source]] * vector[node_id[target]])
     )
 
-def spectral_corr2(graph, source, target, alg = "naive", n_samples=20_000, seed=0):
+def spectral_corr2(
+    graph,
+    source,
+    target,
+    alg="naive",
+    n_samples=20_000,
+    seed=0,
+    num_iter=100,
+):
     """Estimate the squared correlation between two nodes using spectral methods.
     
     Parameters
@@ -127,7 +154,7 @@ def spectral_corr2(graph, source, target, alg = "naive", n_samples=20_000, seed=
         The graph that defines the pairwise synchronization problem.
     source : a vertex of graph
     target : a vertex of graph
-    alg : str, either "naive" or "nb"
+    alg : str, one of "naive", "nb", or "power"
     n_samples: number of samples used to estimate the correlation
     seed: random seed for reproducibility
     """
@@ -148,13 +175,23 @@ def spectral_corr2(graph, source, target, alg = "naive", n_samples=20_000, seed=
                 source,
                 target,
             )
-        else:
+        elif alg == "nb":
             result = nb_spectral(
                 graph,
                 observations,
                 source,
                 target,
             )
+        elif alg == "power":
+            result = power_method_estimate(
+                graph,
+                observations,
+                source,
+                target,
+                num_iter=num_iter,
+            )
+        else:
+            raise ValueError("alg must be one of 'naive', 'nb', or 'power'")
         spectral_values[i] = result
         
 
@@ -208,11 +245,15 @@ def _run_basic_tests() -> None:
 
     nb_result = spectral_corr2(graph, 0, 3, "nb", n_samples = 20000)
     naive_result = spectral_corr2(graph, 0, 3, "naive", n_samples = 20000)
+    power_result = spectral_corr2(graph, 0, 3, "power", n_samples = 20000)
     print("non-backtracking spectral: " + format_estimate(
         nb_result["corr2"], nb_result["standard_error"]
     ))
     print("naive spectral: " + format_estimate(
         naive_result["corr2"], naive_result["standard_error"]
+    ))
+    print("power method: " + format_estimate(
+        power_result["corr2"], power_result["standard_error"]
     ))
 
     # assert naive_spectral(graph, observations, 0, 0) == 1.0
