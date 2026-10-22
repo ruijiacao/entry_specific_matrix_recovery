@@ -5,6 +5,7 @@ import numpy as np
 from .model import Graph, sample_instance
 from .reporting import format_estimate
 
+
 def _signed_adjacency(graph: Graph, observations: np.ndarray) -> np.ndarray:
     """Return the signed adjacency matrix, using the graph's node order."""
     index = {node: i for i, node in enumerate(graph.nodes)}
@@ -31,14 +32,14 @@ def naive_spectral(
     if source == target:
         return 1.0
 
-    eigenvalues, eigenvectors = np.linalg.eigh(
-        _signed_adjacency(graph, observations)
-    )
+    eigenvalues, eigenvectors = np.linalg.eigh(_signed_adjacency(graph, observations))
     vector = eigenvectors[:, np.argmax(eigenvalues)]
     index = {node: i for i, node in enumerate(graph.nodes)}
     signs = np.sign(vector)
-    return float((1 if signs[index[source]] >= 0 else -1) *
-                 (1 if signs[index[target]] >= 0 else -1))
+    return float(
+        (1 if signs[index[source]] >= 0 else -1)
+        * (1 if signs[index[target]] >= 0 else -1)
+    )
 
 
 def nb_spectral(
@@ -59,17 +60,22 @@ def nb_spectral(
     signed_adjacency = _signed_adjacency(graph, observations)
     degrees = np.diag(np.sum(np.abs(signed_adjacency), axis=1))
 
-    operator = np.block([
-        [np.zeros((n, n)), degrees - np.eye(n)],
-        [-np.eye(n), signed_adjacency],
-    ])
+    operator = np.block(
+        [
+            [np.zeros((n, n)), degrees - np.eye(n)],
+            [-np.eye(n), signed_adjacency],
+        ]
+    )
 
     eigenvalues, eigenvectors = np.linalg.eig(operator)
     eigenvalue = np.argmax(np.abs(eigenvalues))
     vector = np.real(eigenvectors[n:, eigenvalue])
     signs = np.sign(vector)
-    return float((1 if signs[index[source]] >= 0 else -1) *
-                 (1 if signs[index[target]] >= 0 else -1))
+    return float(
+        (1 if signs[index[source]] >= 0 else -1)
+        * (1 if signs[index[target]] >= 0 else -1)
+    )
+
 
 def power_method_estimate(
     graph: Graph,
@@ -96,10 +102,7 @@ def power_method_estimate(
         return 1.0
 
     nodes = list(graph.nodes)
-    node_id = {
-        node: i
-        for i, node in enumerate(nodes)
-    }
+    node_id = {node: i for i, node in enumerate(nodes)}
 
     A = np.zeros((len(nodes), len(nodes)))
 
@@ -133,9 +136,8 @@ def power_method_estimate(
             return 0.0
         vector /= norm
 
-    return float(
-        np.sign(vector[node_id[source]] * vector[node_id[target]])
-    )
+    return float(np.sign(vector[node_id[source]] * vector[node_id[target]]))
+
 
 def spectral_corr2(
     graph,
@@ -147,7 +149,7 @@ def spectral_corr2(
     num_iter=100,
 ):
     """Estimate the squared correlation between two nodes using spectral methods.
-    
+
     Parameters
     ----------
     graph : Graph
@@ -193,7 +195,6 @@ def spectral_corr2(
         else:
             raise ValueError("alg must be one of 'naive', 'nb', or 'power'")
         spectral_values[i] = result
-        
 
     # U = X f(Y), V = f(Y)^2
     u = x_values * spectral_values
@@ -213,16 +214,21 @@ def spectral_corr2(
     corr2 = mean_u**2 / mean_v
 
     # Delta-method standard error for g(u, v) = u^2 / v.
-    sample_covariance = np.cov(
-        np.column_stack([u, v]),
-        rowvar=False,
-        ddof=1,
-    ) / n_samples
+    sample_covariance = (
+        np.cov(
+            np.column_stack([u, v]),
+            rowvar=False,
+            ddof=1,
+        )
+        / n_samples
+    )
 
-    gradient = np.array([
-        2 * mean_u / mean_v,
-        -(mean_u**2) / mean_v**2,
-    ])
+    gradient = np.array(
+        [
+            2 * mean_u / mean_v,
+            -(mean_u**2) / mean_v**2,
+        ]
+    )
 
     variance = gradient @ sample_covariance @ gradient
     standard_error = np.sqrt(max(variance, 0.0))
@@ -235,6 +241,24 @@ def spectral_corr2(
     }
 
 
+def naive_spectral_error(G, s, t, n_samples=1000):
+    rng = np.random.default_rng(0)
+
+    A = np.empty(n_samples)
+
+    for i in range(n_samples):
+        spins, observations = sample_instance(G, rng)
+
+        x = spins[s] * spins[t]
+        f = naive_spectral(G, observations, s, t)
+
+        A[i] = x * f
+
+    num_ones = np.count_nonzero(A == 1)
+
+    return num_ones / n_samples
+
+
 def _run_basic_tests() -> None:
     # from binary_sync.model import Graph
 
@@ -243,18 +267,21 @@ def _run_basic_tests() -> None:
     graph.add_edge(1, 2, 0.2)
     graph.add_edge(2, 3, 0.2)
 
-    nb_result = spectral_corr2(graph, 0, 3, "nb", n_samples = 20000)
-    naive_result = spectral_corr2(graph, 0, 3, "naive", n_samples = 20000)
-    power_result = spectral_corr2(graph, 0, 3, "power", n_samples = 20000)
-    print("non-backtracking spectral: " + format_estimate(
-        nb_result["corr2"], nb_result["standard_error"]
-    ))
-    print("naive spectral: " + format_estimate(
-        naive_result["corr2"], naive_result["standard_error"]
-    ))
-    print("power method: " + format_estimate(
-        power_result["corr2"], power_result["standard_error"]
-    ))
+    nb_result = spectral_corr2(graph, 0, 3, "nb", n_samples=20000)
+    naive_result = spectral_corr2(graph, 0, 3, "naive", n_samples=20000)
+    power_result = spectral_corr2(graph, 0, 3, "power", n_samples=20000)
+    print(
+        "non-backtracking spectral: "
+        + format_estimate(nb_result["corr2"], nb_result["standard_error"])
+    )
+    print(
+        "naive spectral: "
+        + format_estimate(naive_result["corr2"], naive_result["standard_error"])
+    )
+    print(
+        "power method: "
+        + format_estimate(power_result["corr2"], power_result["standard_error"])
+    )
 
     # assert naive_spectral(graph, observations, 0, 0) == 1.0
     # assert nb_spectral(graph, observations, 1, 1) == 1.0

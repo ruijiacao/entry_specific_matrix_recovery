@@ -19,31 +19,6 @@ class BPResult:
     residual: float
 
 
-# def _validate_inputs(
-#     graph: Graph,
-#     observations: np.ndarray,
-#     source: Any,
-#     target: Any,
-#     damping: float,
-#     init: str,
-# ) -> np.ndarray:
-#     """Validate public BP arguments and return observations as an array."""
-#     if source not in graph or target not in graph:
-#         raise ValueError("source and target must be vertices of graph")
-#     if not 0 < damping <= 1:
-#         raise ValueError("damping must lie in (0, 1]")
-#     if init not in {"zero", "random"}:
-#         raise ValueError("init must be 'zero' or 'random'")
-
-#     observations = np.asarray(observations)
-#     if observations.shape != (len(graph.edges),):
-#         raise ValueError("observations must have one entry per edge")
-#     if not np.all(np.isin(observations, [-1, 1])):
-#         raise ValueError("each observation must be either -1 or +1")
-
-#     return observations
-
-
 def bp_pair_estimate(
     graph: Graph,
     observations: np.ndarray,
@@ -95,9 +70,7 @@ def bp_pair_estimate(
         initial_point = np.asarray(initial_point, dtype=float)
         expected_shape = (2 * len(graph.edges),)
         if initial_point.shape != expected_shape:
-            raise ValueError(
-                f"initial_point must have shape {expected_shape}"
-            )
+            raise ValueError(f"initial_point must have shape {expected_shape}")
         if not np.all(np.isfinite(initial_point)):
             raise ValueError("initial_point must contain only finite values")
         if np.any(np.abs(initial_point) > 1):
@@ -111,15 +84,11 @@ def bp_pair_estimate(
             if u == source:
                 messages[edge_id, u, v] = 1.0
             elif initial_point is not None:
-                messages[edge_id, u, v] = float(
-                    initial_point[2 * edge_id + direction]
-                )
+                messages[edge_id, u, v] = float(initial_point[2 * edge_id + direction])
             elif init == "zero":
                 messages[edge_id, u, v] = 0.0
             else:
-                messages[edge_id, u, v] = float(
-                    rng.choice([-1, 1])
-                )
+                messages[edge_id, u, v] = float(rng.choice([-1, 1]))
 
     residual = np.inf
     converged = False
@@ -142,19 +111,14 @@ def bp_pair_estimate(
                             continue
 
                         incoming_edge = graph.edges[incoming_id]
-                        incoming_message = messages[
-                            incoming_id, neighbor, u
-                        ]
+                        incoming_message = messages[incoming_id, neighbor, u]
                         q = 1.0 - 2.0 * incoming_edge.p
                         argument = q * observations[incoming_id] * incoming_message
                         argument = float(np.clip(argument, -1 + 1e-15, 1 - 1e-15))
                         field += np.arctanh(argument)
 
                     raw_value = float(np.tanh(field))
-                    value = (
-                        damping * raw_value
-                        + (1.0 - damping) * messages[key]
-                    )
+                    value = damping * raw_value + (1.0 - damping) * messages[key]
 
                 new_messages[key] = value
                 residual = max(residual, abs(value - messages[key]))
@@ -188,7 +152,7 @@ def bp_corr2(
     **bp_kwargs,
 ):
     """
-    Estimate the Corr^2 = E[X f(Y)]^2 / E[f(Y)^2] using for the BP algorithm 
+    Estimate the Corr^2 = E[X f(Y)]^2 / E[f(Y)^2] using for the BP algorithm
     """
     rng = np.random.default_rng(seed)
 
@@ -209,7 +173,6 @@ def bp_corr2(
             **bp_kwargs,
         )
         bp_values[i] = result.correlation
-        
 
     # U = X f(Y), V = f(Y)^2
     u = x_values * bp_values
@@ -229,16 +192,21 @@ def bp_corr2(
     corr2 = mean_u**2 / mean_v
 
     # Delta-method standard error for g(u, v) = u^2 / v.
-    sample_covariance = np.cov(
-        np.column_stack([u, v]),
-        rowvar=False,
-        ddof=1,
-    ) / n_samples
+    sample_covariance = (
+        np.cov(
+            np.column_stack([u, v]),
+            rowvar=False,
+            ddof=1,
+        )
+        / n_samples
+    )
 
-    gradient = np.array([
-        2 * mean_u / mean_v,
-        -(mean_u**2) / mean_v**2,
-    ])
+    gradient = np.array(
+        [
+            2 * mean_u / mean_v,
+            -(mean_u**2) / mean_v**2,
+        ]
+    )
 
     variance = gradient @ sample_covariance @ gradient
     standard_error = np.sqrt(max(variance, 0.0))
@@ -263,10 +231,10 @@ def _run_basic_tests() -> None:
 
     # result = bp_pair_result(graph, observations, 0, 2)
     result = bp_corr2(graph, 0, 2, n_samples=1000, seed=7)
-    print("belief propagation: " + format_estimate(
-        result["corr2"], result["standard_error"]
-    ))
-
+    print(
+        "belief propagation: "
+        + format_estimate(result["corr2"], result["standard_error"])
+    )
 
     # random_value = bp_pair_estimate(
     #     graph, observations, 0, 2, init="random", seed=123

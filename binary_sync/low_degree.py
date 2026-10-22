@@ -108,9 +108,7 @@ def low_degree_weights(G: Graph, s, t, p, degree=None):
         degree = num_edges
 
     if not 0 <= degree <= num_edges:
-        raise ValueError(
-            f"degree must lie between 0 and {num_edges}."
-        )
+        raise ValueError(f"degree must lie between 0 and {num_edges}.")
 
     target_boundary = set() if s == t else {s, t}
     basis_masks = []
@@ -166,16 +164,14 @@ def low_degree_weights(G: Graph, s, t, p, degree=None):
         weights = np.linalg.lstsq(sigma, c, rcond=None)[0]
 
     def mask_to_edge_ids(mask):
-        return tuple(
-            edge_id
-            for edge_id in range(num_edges)
-            if mask & (1 << edge_id)
-        )
+        return tuple(edge_id for edge_id in range(num_edges) if mask & (1 << edge_id))
 
     return {
         mask_to_edge_ids(mask): float(weight)
         for mask, weight in zip(basis_masks, weights)
     }
+
+
 def print_low_degree_weights(G, weights):
     print("Edge IDs:")
     for edge_id, edge in enumerate(G.edges):
@@ -183,16 +179,9 @@ def print_low_degree_weights(G, weights):
 
     print("\nLow-degree weights:")
     for edge_ids, weight in weights.items():
-        edge_list = [
-            (G.edges[edge_id].u, G.edges[edge_id].v)
-            for edge_id in edge_ids
-        ]
+        edge_list = [(G.edges[edge_id].u, G.edges[edge_id].v) for edge_id in edge_ids]
 
-        print(
-            f"  basis={edge_ids}, "
-            f"edges={edge_list}, "
-            f"weight={weight:.6f}"
-        )
+        print(f"  basis={edge_ids}, " f"edges={edge_list}, " f"weight={weight:.6f}")
 
 
 def _run_basic_tests() -> None:
@@ -208,11 +197,10 @@ def _run_basic_tests() -> None:
         s=0,
         t=2,
         p=0.1,
-        degree=2,)
+        degree=2,
+    )
 
     print_low_degree_weights(graph, weights)
-
-
 
 
 if __name__ == "__main__":

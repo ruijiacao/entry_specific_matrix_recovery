@@ -1,0 +1,6 @@
+# from typing import Any
+#
+# import numpy as np
+#
+#
+# def bayes_estiamator(G, observations, s, t):
