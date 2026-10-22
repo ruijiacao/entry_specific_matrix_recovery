@@ -1,5 +1,0 @@
-streamlit
-streamlit-agraph
-numpy
-networkx
-matplotlib
